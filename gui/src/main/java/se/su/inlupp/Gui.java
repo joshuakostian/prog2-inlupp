@@ -31,6 +31,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -88,6 +89,11 @@ public class Gui extends Application {
     var newPlace = new Button("New Place");
     var newConn = new Button("New Connection");
     var changeConn = new Button("Change Connection");
+    //findPath.setDisable(true);
+    //showConn.setDisable(true);
+    //newPlace.setDisable(true);
+    //newConn.setDisable(true);
+    //changeConn.setDisable(true);
 
     hbox.getChildren().addAll(findPath, showConn, newPlace, newConn, changeConn);
 
@@ -148,7 +154,7 @@ public class Gui extends Application {
     //
     newMap.setOnAction(event -> {
       File file = getFile();
-      System.out.println(file.toURI().toString());
+      //System.out.println(file.toURI().toString());
       Image image = new Image(file.toURI().toString());
       ImageView imageView = new ImageView(image);
 
@@ -170,17 +176,63 @@ public class Gui extends Application {
       }
       Location[] compare = test.get();
 
-      // getEdgeBetween throws NoSuchElementException om det inte finns en connection.
+      //getedgebetween returnar null om det INTE finns. Därför gör vi negation.
       if (graph.getEdgeBetween(compare[0], compare[1]) != null) {
         createErrorPopup(AlertType.ERROR, "Error!", "A connection already exists.");
       } else {
-        /*
-         * TODO Skriv koden här:
-         * 
-         * Om ingen förbindelse finns sedan tidigare mellan de två markerade platserna
-         * skall en ny förbindelse skapas
-         * 
-         */
+        Location from = compare[0];
+        Location to = compare[1];
+        String name;
+        int weight=0;
+
+
+        //skapar rolig Dialog
+        Dialog<String[]> dialog = new Dialog<>();
+        dialog.setTitle("Connection");
+        dialog.setHeaderText("headerText");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.add(new Label("Name:"), 0, 0);
+        TextField nameInputField = new TextField();
+        grid.add(nameInputField, 1, 0);
+        grid.add(new Label("Time:"), 0, 1);
+        TextField timeInputField = new TextField();
+        grid.add(timeInputField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(button -> 
+            button == ButtonType.OK ? new String[]{nameInputField.getText(),timeInputField.getText()} : null
+        );
+        String input[] = dialog.showAndWait().orElse(null);
+        try {
+          System.out.println(input[0]+input[1]);
+        } catch (NullPointerException e) {
+          return;
+        }
+          /*if () {
+
+          TODO:Gör bättre error checking. Värdet på weight kan t.ex. vara 0 här.
+
+          Mest of koden är lite shit här ngl ngl ngl. Men det funkar. Error handlingen är suprisingly okej tho
+          }*/
+          if (input[0].trim().isBlank()) {
+            //det här är temp, gör GÄRNA OM createErrorPopup();
+            createErrorPopup(AlertType.ERROR, "Namn...", "skriv in korrekt namn");
+            return;
+          }
+          name = input[0].trim();
+          try {
+            weight=Integer.parseInt(input[1].trim());
+          } catch (Exception e) {
+            createErrorPopup(AlertType.ERROR, "Tim...", "skriv in korrekt Tid");
+            return;
+          }
+          graph.connect(from, to, name, weight);
+          System.out.println(graph.toString());
+          DrawEdge(from,to,imageContainer);
       }
 
     });
@@ -205,6 +257,7 @@ public class Gui extends Application {
     error.setContentText(contentText);
     error.showAndWait();
   }
+  
 
   private File getFile() {
     FileChooser fileChooser = new FileChooser();
@@ -257,7 +310,11 @@ public class Gui extends Application {
     // return if two were found.
     return (counter == 2) ? Optional.of(returnArray) : Optional.empty();
   }
-
+  public void DrawEdge(Location loc1, Location loc2, Pane containerToAddTo){
+    Line line = new Line(loc1.getX(),loc1.getY(),loc2.getX(),loc2.getY());
+    line.setStrokeWidth(5);
+    containerToAddTo.getChildren().add(line);
+  }
   public static void main(String[] args) {
     launch(args);
   }
@@ -336,7 +393,7 @@ public class Gui extends Application {
 
     @Override
     public String toString() {
-      return label.getText() + ":" + x + ":" + y + "\n";
+      return "\n"+label.getText() + ":" + x + ":" + y ;
     }
   }
 
