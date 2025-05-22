@@ -169,7 +169,7 @@ public class ListGraph<T> implements Graph<T> {
     return str.toString();
   }
 
-  private boolean nodeExist(T node) {
+  public boolean nodeExist(T node) {
     return connections.containsKey(node);
   }
 
