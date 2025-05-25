@@ -3,14 +3,11 @@ package se.su.inlupp;
 import javafx.application.Application;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
-import javafx.scene.control.DialogEvent;
-import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
@@ -21,31 +18,20 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.Border;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.BorderStroke;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
-import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
-import javafx.event.EventType;
 import javafx.scene.paint.*;
-
-import java.awt.List;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 
@@ -59,6 +45,7 @@ public class Gui extends Application {
   public void start(Stage stage) {
     this.stage = stage;
 
+    //Initialize JavaFX
     BorderPane root = new BorderPane();
     Scene scene = new Scene(root);
 
@@ -112,8 +99,143 @@ public class Gui extends Application {
     imageContainer.setOnMouseExited(exit -> {
       scene.setCursor(Cursor.DEFAULT);
     });
-    imageContainer.setOnMouseClicked(click -> {
-      if (!hasClickedNewPlace)
+    imageContainer.setOnMouseClicked(click ->mapContainerClickedHandler(click,newPlace));
+    //
+    // FILE MENU BEHAVIOR
+    //
+    newMap.setOnAction(event -> newMapButtonHandler(root));
+    newConn.setOnAction(event ->newConnectionButtonHandler());
+    //
+    // MAP MENU BEHAVIOR
+    //
+    newPlace.setOnAction(event -> {
+      hasClickedNewPlace = true;
+      newPlace.setDisable(true);
+    });
+
+    stage.setScene(scene);
+    stage.show();
+  }
+
+  //
+  // UTIL
+  //
+  private void createErrorPopup(AlertType type, String headerText, String contentText) {
+    Alert error = new Alert(type);
+    error.setHeaderText(headerText);
+    error.setContentText(contentText);
+    error.showAndWait();
+  }
+  private File getFile() {
+    FileChooser fileChooser = new FileChooser();
+
+    fileChooser.getExtensionFilters().addAll(
+        new FileChooser.ExtensionFilter("Gif", "*.gif"),
+        new FileChooser.ExtensionFilter("Graph", "*.graph"));
+
+    File selectedFile = fileChooser.showOpenDialog(stage);
+
+    return selectedFile;
+  }
+  private Optional<String> getPlaceName() {
+    TextInputDialog tid = new TextInputDialog();
+    tid.setTitle("Name");
+    tid.setHeaderText("Name of place: ");
+
+    Button okButton = (Button) tid.getDialogPane().lookupButton(ButtonType.OK);
+
+    TextField input = tid.getEditor();
+
+    okButton.setDisable(true);
+
+    input.textProperty().addListener((obs, oldText, newText) -> {
+      okButton.setDisable(newText.trim().isEmpty());
+    });
+
+    return tid.showAndWait();
+  }
+  private void newConnectionButtonHandler(){
+      Optional<Location[]> test = getTwoMarkedCircles();
+      if (test.isEmpty()) {
+        createErrorPopup(AlertType.ERROR, "Error", "Two places must be selected");
+        return;
+      }
+      Location[] compare = test.get();
+
+      // getedgebetween returnar null om det INTE finns. Därför gör vi negation.
+      if (graph.getEdgeBetween(compare[0], compare[1]) != null) {
+        createErrorPopup(AlertType.ERROR, "Error!", "A connection already exists.");
+      } else {
+        Location from = compare[0];
+        Location to = compare[1];
+        String name;
+        int weight = 0;
+
+        // skapar dialog som ber om och tar inputs. Sparar i input[0,1]
+        Dialog<String[]> dialog = new Dialog<>();
+        dialog.setTitle("Connection");
+        dialog.setHeaderText("headerText");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.add(new Label("Name:"), 0, 0);
+        TextField nameInputField = new TextField();
+        grid.add(nameInputField, 1, 0);
+        grid.add(new Label("Time:"), 0, 1);
+        TextField timeInputField = new TextField();
+        grid.add(timeInputField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(
+            button -> button == ButtonType.OK ? new String[] { nameInputField.getText(), timeInputField.getText() }
+                : null);
+        String input[] = dialog.showAndWait().orElse(null);
+
+        // Mest of koden är lite shit här ngl ngl ngl. Men det funkar. Error handlingen
+        // är suprisingly okej tho
+        if (input[0].trim().isBlank()) {
+          // det här är temp, gör GÄRNA OM createErrorPopup();
+          createErrorPopup(AlertType.ERROR, "Fel input i namn", "skriv in ett namn.");
+          return;
+        }
+        name = input[0].trim();
+        try {
+          weight = Integer.parseInt(input[1].trim());
+        } catch (Exception e) {
+          createErrorPopup(AlertType.ERROR, "Fel input i tid", "Skriv in ett nummer som tid.");
+          return;
+        }
+        if (weight <= 0) {
+          createErrorPopup(AlertType.ERROR, "Fel input i tid", "Tiden får inte vara 0 eller negativt.");
+          return;
+        }
+        graph.connect(from, to, name, weight);
+        System.out.println(graph.toString()); // debug
+        DrawEdge(from, to, imageContainer); 
+        //Den här är inte kopplad till något. Man kan inte ta bort en connection. Den bara ritar.
+        //Kanske lägga till funktionalitet på edge???
+      }
+
+    
+  }
+  private void newMapButtonHandler(BorderPane root){
+    File file = getFile();
+      // System.out.println(file.toURI().toString());
+      Image image = new Image(file.toURI().toString());
+      ImageView imageView = new ImageView(image);
+
+      imageContainer.getChildren().add(imageView);
+      imageContainer.setMaxSize(image.getWidth(), image.getHeight());
+      imageContainer.setMinSize(image.getWidth(), image.getHeight());
+
+      root.setCenter(imageContainer);
+
+      stage.sizeToScene();
+  }
+  private void mapContainerClickedHandler(MouseEvent click, Button newPlace){
+    if (!hasClickedNewPlace)
         return;
 
       var placeName = getPlaceName();
@@ -147,150 +269,7 @@ public class Gui extends Application {
       // debug
       Set<Location> test = graph.getNodes();
       System.out.println(test.toString());
-
-    });
-    //
-    // FILE MENU BEHAVIOR
-    //
-    newMap.setOnAction(event -> {
-      File file = getFile();
-      // System.out.println(file.toURI().toString());
-      Image image = new Image(file.toURI().toString());
-      ImageView imageView = new ImageView(image);
-
-      imageContainer.getChildren().add(imageView);
-      imageContainer.setMaxSize(image.getWidth(), image.getHeight());
-      imageContainer.setMinSize(image.getWidth(), image.getHeight());
-
-      root.setCenter(imageContainer);
-
-      stage.sizeToScene();
-
-    });
-    // Det här och GetTwoMarkedCircles är magic ass code.
-    newConn.setOnAction(event -> {
-      Optional<Location[]> test = getTwoMarkedCircles();
-      if (test.isEmpty()) {
-        createErrorPopup(AlertType.ERROR, "Error", "Two places must be selected");
-        return;
-      }
-      Location[] compare = test.get();
-
-      // getedgebetween returnar null om det INTE finns. Därför gör vi negation.
-      if (graph.getEdgeBetween(compare[0], compare[1]) != null) {
-        createErrorPopup(AlertType.ERROR, "Error!", "A connection already exists.");
-      } else {
-        Location from = compare[0];
-        Location to = compare[1];
-        String name;
-        int weight = 0;
-
-        // skapar rolig Dialog
-        Dialog<String[]> dialog = new Dialog<>();
-        dialog.setTitle("Connection");
-        dialog.setHeaderText("headerText");
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.add(new Label("Name:"), 0, 0);
-        TextField nameInputField = new TextField();
-        grid.add(nameInputField, 1, 0);
-        grid.add(new Label("Time:"), 0, 1);
-        TextField timeInputField = new TextField();
-        grid.add(timeInputField, 1, 1);
-
-        dialog.getDialogPane().setContent(grid);
-        dialog.setResultConverter(
-            button -> button == ButtonType.OK ? new String[] { nameInputField.getText(), timeInputField.getText() }
-                : null);
-        String input[] = dialog.showAndWait().orElse(null);
-        try {
-          System.out.println(input[0] + input[1]);
-        } catch (NullPointerException e) {
-          return;
-        }
-        /*
-         * if () {
-         * 
-         * TODO:Gör bättre error checking. Värdet på weight kan t.ex. vara 0 här.
-         * 
-         * Mest of koden är lite shit här ngl ngl ngl. Men det funkar. Error handlingen
-         * är suprisingly okej tho
-         * }
-         */
-        if (input[0].trim().isBlank()) {
-          // det här är temp, gör GÄRNA OM createErrorPopup();
-          createErrorPopup(AlertType.ERROR, "Namn...", "skriv in korrekt namn");
-          return;
-        }
-        name = input[0].trim();
-        try {
-          weight = Integer.parseInt(input[1].trim());
-        } catch (Exception e) {
-          createErrorPopup(AlertType.ERROR, "Tim...", "skriv in korrekt Tid");
-          return;
-        }
-        graph.connect(from, to, name, weight);
-        System.out.println(graph.toString());
-        DrawEdge(from, to, imageContainer);
-      }
-
-    });
-    //
-    // MAP MENU BEHAVIOR
-    //
-    newPlace.setOnAction(event -> {
-      hasClickedNewPlace = true;
-      newPlace.setDisable(true);
-    });
-
-    stage.setScene(scene);
-    stage.show();
   }
-
-  //
-  // UTIL
-  //
-  private void createErrorPopup(AlertType type, String headerText, String contentText) {
-    Alert error = new Alert(type);
-    error.setHeaderText(headerText);
-    error.setContentText(contentText);
-    error.showAndWait();
-  }
-
-  private File getFile() {
-    FileChooser fileChooser = new FileChooser();
-
-    fileChooser.getExtensionFilters().addAll(
-        new FileChooser.ExtensionFilter("Gif", "*.gif"),
-        new FileChooser.ExtensionFilter("Graph", "*.graph"));
-
-    File selectedFile = fileChooser.showOpenDialog(stage);
-
-    return selectedFile;
-  }
-
-  private Optional<String> getPlaceName() {
-    TextInputDialog tid = new TextInputDialog();
-    tid.setTitle("Name");
-    tid.setHeaderText("Name of place: ");
-
-    Button okButton = (Button) tid.getDialogPane().lookupButton(ButtonType.OK);
-
-    TextField input = tid.getEditor();
-
-    okButton.setDisable(true);
-
-    input.textProperty().addListener((obs, oldText, newText) -> {
-      okButton.setDisable(newText.trim().isEmpty());
-    });
-
-    return tid.showAndWait();
-  }
-
-  // Det här är magic ass code.
   // Returnar Empty om det är mindre än två.
   // Returnar objekten i en array [0,1] om det finns två.
   public Optional<Location[]> getTwoMarkedCircles() {
@@ -311,17 +290,14 @@ public class Gui extends Application {
     // return if two were found.
     return (counter == 2) ? Optional.of(returnArray) : Optional.empty();
   }
-
   public void DrawEdge(Location loc1, Location loc2, Pane containerToAddTo) {
     Line line = new Line(loc1.getX(), loc1.getY(), loc2.getX(), loc2.getY());
     line.setStrokeWidth(5);
     containerToAddTo.getChildren().add(line);
   }
-
   public static void main(String[] args) {
     launch(args);
   }
-
   private class Location extends Pane {
     private Circle circle;
     private Label label;
