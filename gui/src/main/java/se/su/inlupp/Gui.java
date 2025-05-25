@@ -33,6 +33,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.StrokeType;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
@@ -89,11 +90,11 @@ public class Gui extends Application {
     var newPlace = new Button("New Place");
     var newConn = new Button("New Connection");
     var changeConn = new Button("Change Connection");
-    //findPath.setDisable(true);
-    //showConn.setDisable(true);
-    //newPlace.setDisable(true);
-    //newConn.setDisable(true);
-    //changeConn.setDisable(true);
+    // findPath.setDisable(true);
+    // showConn.setDisable(true);
+    // newPlace.setDisable(true);
+    // newConn.setDisable(true);
+    // changeConn.setDisable(true);
 
     hbox.getChildren().addAll(findPath, showConn, newPlace, newConn, changeConn);
 
@@ -154,7 +155,7 @@ public class Gui extends Application {
     //
     newMap.setOnAction(event -> {
       File file = getFile();
-      //System.out.println(file.toURI().toString());
+      // System.out.println(file.toURI().toString());
       Image image = new Image(file.toURI().toString());
       ImageView imageView = new ImageView(image);
 
@@ -176,17 +177,16 @@ public class Gui extends Application {
       }
       Location[] compare = test.get();
 
-      //getedgebetween returnar null om det INTE finns. Därför gör vi negation.
+      // getedgebetween returnar null om det INTE finns. Därför gör vi negation.
       if (graph.getEdgeBetween(compare[0], compare[1]) != null) {
         createErrorPopup(AlertType.ERROR, "Error!", "A connection already exists.");
       } else {
         Location from = compare[0];
         Location to = compare[1];
         String name;
-        int weight=0;
+        int weight = 0;
 
-
-        //skapar rolig Dialog
+        // skapar dialog som ber om och tar inputs. Sparar i input[0,1]
         Dialog<String[]> dialog = new Dialog<>();
         dialog.setTitle("Connection");
         dialog.setHeaderText("headerText");
@@ -203,36 +203,40 @@ public class Gui extends Application {
         grid.add(timeInputField, 1, 1);
 
         dialog.getDialogPane().setContent(grid);
-        dialog.setResultConverter(button -> 
-            button == ButtonType.OK ? new String[]{nameInputField.getText(),timeInputField.getText()} : null
-        );
+        dialog.setResultConverter(
+            button -> button == ButtonType.OK ? new String[] { nameInputField.getText(), timeInputField.getText() }
+                : null);
         String input[] = dialog.showAndWait().orElse(null);
         try {
-          System.out.println(input[0]+input[1]);
+          System.out.println(input[0] + input[1]);
         } catch (NullPointerException e) {
           return;
         }
-          /*if () {
 
-          TODO:Gör bättre error checking. Värdet på weight kan t.ex. vara 0 här.
+        // Mest of koden är lite shit här ngl ngl ngl. Men det funkar. Error handlingen
+        // är suprisingly okej tho
 
-          Mest of koden är lite shit här ngl ngl ngl. Men det funkar. Error handlingen är suprisingly okej tho
-          }*/
-          if (input[0].trim().isBlank()) {
-            //det här är temp, gör GÄRNA OM createErrorPopup();
-            createErrorPopup(AlertType.ERROR, "Namn...", "skriv in korrekt namn");
-            return;
-          }
-          name = input[0].trim();
-          try {
-            weight=Integer.parseInt(input[1].trim());
-          } catch (Exception e) {
-            createErrorPopup(AlertType.ERROR, "Tim...", "skriv in korrekt Tid");
-            return;
-          }
-          graph.connect(from, to, name, weight);
-          System.out.println(graph.toString());
-          DrawEdge(from,to,imageContainer);
+        if (input[0].trim().isBlank()) {
+          // det här är temp, gör GÄRNA OM createErrorPopup();
+          createErrorPopup(AlertType.ERROR, "Fel input i namn", "skriv in ett namn.");
+          return;
+        }
+        name = input[0].trim();
+        try {
+          weight = Integer.parseInt(input[1].trim());
+        } catch (Exception e) {
+          createErrorPopup(AlertType.ERROR, "Fel input i tid", "Skriv in ett nummer som tid.");
+          return;
+        }
+        if (weight <= 0) {
+          createErrorPopup(AlertType.ERROR, "Fel input i tid", "Tiden får inte vara 0 eller negativt.");
+          return;
+        }
+        graph.connect(from, to, name, weight);
+        System.out.println(graph.toString()); // debug
+        DrawEdge(from, to, imageContainer); 
+        //Den här är inte kopplad till något. Man kan inte ta bort en connection. Den bara ritar.
+        //Kanske lägga till funktionalitet på edge???
       }
 
     });
@@ -257,7 +261,6 @@ public class Gui extends Application {
     error.setContentText(contentText);
     error.showAndWait();
   }
-  
 
   private File getFile() {
     FileChooser fileChooser = new FileChooser();
@@ -310,11 +313,13 @@ public class Gui extends Application {
     // return if two were found.
     return (counter == 2) ? Optional.of(returnArray) : Optional.empty();
   }
-  public void DrawEdge(Location loc1, Location loc2, Pane containerToAddTo){
-    Line line = new Line(loc1.getX(),loc1.getY(),loc2.getX(),loc2.getY());
+
+  public void DrawEdge(Location loc1, Location loc2, Pane containerToAddTo) {
+    Line line = new Line(loc1.getX(), loc1.getY(), loc2.getX(), loc2.getY());
     line.setStrokeWidth(5);
     containerToAddTo.getChildren().add(line);
   }
+
   public static void main(String[] args) {
     launch(args);
   }
@@ -393,7 +398,7 @@ public class Gui extends Application {
 
     @Override
     public String toString() {
-      return "\n"+label.getText() + ":" + x + ":" + y ;
+      return "\n" + label.getText() + ":" + x + ":" + y;
     }
   }
 
