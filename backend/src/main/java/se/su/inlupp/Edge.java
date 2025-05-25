@@ -7,7 +7,7 @@ public class Edge<T> {
   private String name;
   private int weight;
 
-  public Edge(T source, T destination, String name, int weight) {
+  public Edge(T source, T destination, String name, int weight)  {
     this.name = name;
     this.source = source;
     this.destination = destination;
